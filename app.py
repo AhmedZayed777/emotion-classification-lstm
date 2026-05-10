@@ -4,11 +4,12 @@ import pickle
 import re
 import string
 import nltk
+import contractions
 import tensorflow as tf
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-from keras.models import load_model
-from keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
@@ -25,20 +26,27 @@ def load_assets():
 
 model, tokenizer, encoder = load_assets()
 
-MAX_LEN = 50  # must match what you used during training
+MAX_LEN = 50
 
 # ── Preprocessing (same pipeline as training) ────────────────────────
 stop_words = set(stopwords.words('english'))
-stop_words -= {'not', 'no', 'nor', 'never', 'very', 'too'}
+excluded_words = {
+    'not', 'no', 'nor', 'never', 'very', 'too',
+    "don't", "doesn't", "didn't", "won't", "can't",
+    "couldn't", "shouldn't", "wouldn't", "isn't",
+    "aren't", "wasn't", "weren't", "hadn't", "hasn't"
+}
+stop_words = stop_words.difference(excluded_words)
 lemmatizer = WordNetLemmatizer()
 
 def preprocess(text):
+    text = contractions.fix(text)                                          # expand don't → do not
     text = text.lower()
-    text = re.sub(r'https?://\S+|www\.\S+', '', text)
-    text = ''.join([c for c in text if c not in string.punctuation])
-    text = ''.join([c for c in text if not c.isdigit()])
-    text = ' '.join([w for w in text.split() if w not in stop_words])
-    text = ' '.join([lemmatizer.lemmatize(w) for w in text.split()])
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)                     # remove URLs
+    text = ''.join([c for c in text if c not in string.punctuation])      # remove punctuation
+    text = ''.join([c for c in text if not c.isdigit()])                  # remove numbers
+    text = ' '.join([w for w in text.split() if w not in stop_words])     # remove stop words
+    text = ' '.join([lemmatizer.lemmatize(w) for w in text.split()])      # lemmatize
     return text
 
 def predict_emotion(text):
